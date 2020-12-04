@@ -15,6 +15,7 @@ from __future__ import absolute_import
 import io
 import json
 import logging
+import numbers
 import re
 import ssl
 
@@ -125,7 +126,8 @@ class RESTClientObject(object):
         :param _request_timeout: timeout setting for this request. If one
                                  number provided, it will be total request
                                  timeout. It can also be a pair (tuple) of
-                                 (connection, read) timeouts.
+                                 (connection, read) timeouts or a dict of
+                                 timeouts to be passed to urllib3.Timeout.
         """
         method = method.upper()
         assert method in ['GET', 'HEAD', 'DELETE', 'POST', 'PUT',
@@ -141,12 +143,20 @@ class RESTClientObject(object):
 
         timeout = None
         if _request_timeout:
-            if isinstance(_request_timeout, (int, ) if six.PY3 else (int, long)):  # noqa: E501,F821
+            if isinstance(_request_timeout, numbers.Real):
                 timeout = urllib3.Timeout(total=_request_timeout)
             elif (isinstance(_request_timeout, tuple) and
                   len(_request_timeout) == 2):
                 timeout = urllib3.Timeout(
                     connect=_request_timeout[0], read=_request_timeout[1])
+            elif isinstance(_request_timeout, dict):
+                timeout = urllib3.Timeout(**_request_timeout)
+            if timeout is None:
+                raise ValueError(
+                    "_request_timeout must be a number, tuple of two numbers,"
+                    " or a dict of keyword args for urllib3.Timeout, got %r"
+                    % (_request_timeout,)
+                )
 
         if 'Content-Type' not in headers:
             headers['Content-Type'] = 'application/json'
